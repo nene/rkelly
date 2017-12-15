@@ -87,6 +87,11 @@ class TokenizerTest < Test::Unit::TestCase
     assert_tokens([[:IDENT, 'foo']], tokens)
   end
 
+  def test_dollar_sign_identifier
+    tokens = @tokenizer.tokenize("$foo")
+    assert_tokens([[:IDENT, '$foo']], tokens)
+  end
+
   def test_ignore_identifier
     tokens = @tokenizer.tokenize("0foo")
     assert_tokens([[:NUMBER, 0], [:IDENT, 'foo']], tokens)
@@ -220,6 +225,22 @@ class TokenizerTest < Test::Unit::TestCase
     ], tokens)
   end
 
+  def test_unicode_ident
+    tokens = @tokenizer.tokenize("öäüõ = 'foo';")
+    assert_tokens([
+                 [:IDENT, 'öäüõ'],
+                 ['=', '='],
+                 [:STRING, "'foo'"],
+                 [';', ';'],
+    ], tokens)
+  end
+
+  def test_invalid_unicode_ident
+    assert_raises(RKelly::SyntaxError) do
+      @tokenizer.tokenize("☺ = 'foo';")
+    end
+  end
+  
   %w{
     break case catch continue default delete do else finally for function
     if in instanceof new return switch this throw try typeof var void while

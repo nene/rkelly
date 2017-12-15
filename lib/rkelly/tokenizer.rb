@@ -110,6 +110,26 @@ module RKelly
       )+
     }mx
 
+    # Per https://gist.github.com/mathiasbynens/6334847
+    IDENT_REGEX = "".respond_to?(:encoding) ? %r{
+      # start
+      ((?:
+        [$_]  |                 # Dollar sign or underscore
+        \p{L} |                 # Letter
+        \p{Nl}                  # Number: Letter
+       )
+      # rest
+       (?:
+        [$_] | \p{L} | \p{Nl} | # as per start
+        [\u200c-\u200d] |       # zero width non-joiner/joiner
+        \p{Mn} |                # Mark: Nonspacing
+        \p{Mc} |                # Mark: Spacing Combining
+        \p{Nd} |                # Number: Decimal Digit
+        \p{Pc}                  # Punctuation: Connector
+       )*
+      )
+    }ux : /([_\$A-Za-z][_\$0-9A-Za-z]*)/
+
     def initialize(&block)
       @lexemes = Hash.new {|hash, key| hash[key] = [] }
 
@@ -136,7 +156,7 @@ module RKelly
       end
 
       word_chars = ('a'..'z').to_a + ('A'..'Z').to_a + ['_', '$']
-      token(:RAW_IDENT, /([_\$A-Za-z][_\$0-9A-Za-z]*)/, word_chars) do |type,value|
+      @ident = token(:RAW_IDENT, IDENT_REGEX, word_chars) do |type,value|
         if KEYWORDS[value]
           [KEYWORDS[value], value]
         elsif RESERVED[value]
@@ -195,6 +215,7 @@ module RKelly
       accepting_regexp = true
       while !scanner.eos?
         token = match_lexeme(scanner, accepting_regexp)
+        raise RKelly::SyntaxError unless token
 
         if token.name != :S
           accepting_regexp = followable_by_regex(token)
@@ -224,6 +245,7 @@ module RKelly
       if str = scanner.check(WHITESPACE_REGEX)
         return Token.new(:S, str)
       end
+      @ident.match(scanner)
     end
 
     # Registers a lexeme and maps it to all the characters it can
@@ -234,6 +256,7 @@ module RKelly
       chars.each do |c|
         @lexemes[c] << lexeme
       end
+      lexeme
     end
 
     def followable_by_regex(current_token)
